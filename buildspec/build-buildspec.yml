@@ -1,0 +1,102 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.10
+      docker: 20
+    commands:
+      # Install dependencies
+      - pip install -r requirements.txt
+      - pip install bandit safety
+
+      # Install Trivy
+      - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      # Install OWASP ZAP
+      - wget https://github.com/zaproxy/zaproxy/releases/download/v2.12.0/ZAP_2.12.0_Linux.tar.gz
+      - tar -xvf ZAP_2.12.0_Linux.tar.gz
+      - export PATH=$PATH:$PWD/ZAP_2.12.0/
+
+  pre_build:
+    commands:
+      # Run Python-specific security scanners
+      - echo "Running Bandit security scan"
+      - bandit -r app/ -f json -o bandit-results.json || true
+
+      - echo "Running Safety check on dependencies"
+      - safety check --full-report -o json > safety-results.json || true
+
+      # Build Docker image for scanning
+      - echo "Building Docker image for scanning"
+      - docker build -t $ECR_REPOSITORY_URI:scan -f docker/Dockerfile .
+
+  build:
+    commands:
+      # Run Trivy container scan
+      - echo "Running Trivy vulnerability scanner"
+      - trivy image --format json --output trivy-results.json $ECR_REPOSITORY_URI:scan
+
+      # Start container for OWASP ZAP scan
+      - echo "Starting container for OWASP ZAP scan"
+      - docker run -d --name hello-api-container -p 8000:8000 $ECR_REPOSITORY_URI:scan
+      - sleep 10  # Give container time to start
+
+      # Run OWASP ZAP scan
+      - echo "Running OWASP ZAP scan"
+      - ZAP_2.12.0/zap.sh -cmd -quickurl http://localhost:8000 -quickout zap-report.html || true
+
+  post_build:
+    commands:
+      # Stop container
+      - docker stop hello-api-container || true
+
+      # Process results and determine if build should fail
+      - echo "Processing security scan results"
+      - |
+        python -c "
+        import json
+        import sys
+        
+        fail_build = False
+        
+        # Check Bandit results
+        try:
+            with open('bandit-results.json', 'r') as f:
+                bandit_results = json.load(f)
+                high_severity = [r for r in bandit_results['results'] if r['issue_severity'] == 'HIGH']
+                if high_severity:
+                    print(f'Found {len(high_severity)} high severity issues with Bandit')
+                    fail_build = True
+        except Exception as e:
+            print(f'Error processing Bandit results: {e}')
+        
+        # Check Trivy results
+        try:
+            with open('trivy-results.json', 'r') as f:
+                trivy_results = json.load(f)
+                for result in trivy_results['Results']:
+                    if 'Vulnerabilities' in result:
+                        critical = [v for v in result['Vulnerabilities'] if v['Severity'] == 'CRITICAL']
+                        if critical:
+                            print(f'Found {len(critical)} critical vulnerabilities with Trivy')
+                            fail_build = True
+        except Exception as e:
+            print(f'Error processing Trivy results: {e}')
+        
+        # Exit with error if critical issues found and we're in production
+        if fail_build and '${ENVIRONMENT}' == 'pro':
+            print('Critical security issues found in production build. Failing build.')
+            sys.exit(1)
+        elif fail_build:
+            print('Security issues found, but allowing build to continue in non-production environment.')
+        else:
+            print('No critical security issues found.')
+        "
+
+artifacts:
+  files:
+    - bandit-results.json
+    - safety-results.json
+    - trivy-results.json
+    - zap-report.html

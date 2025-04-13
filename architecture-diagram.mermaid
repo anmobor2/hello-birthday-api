@@ -1,0 +1,55 @@
+flowchart TB
+    subgraph "VPC"
+        subgraph "Public Subnet 1"
+            ALB("Application Load Balancer")
+            subgraph "ECS Fargate Cluster"
+                TASK1("Task 1\nFastAPI App\n(Primary)")
+                TASK2("Task 2\nFastAPI App\n(Failover)")
+            end
+        end
+        
+        subgraph "Private Subnet"
+            subgraph "Amazon Aurora Serverless"
+                DB("SQLite/PostgreSQL\nDatabase")
+            end
+        end
+    end
+    
+    subgraph "External Services"
+        ROUTE53("Route 53")
+        ECR("Elastic Container Registry")
+        CLOUDWATCH("CloudWatch")
+        SECRETS("Secrets Manager")
+        WAF("AWS WAF")
+    end
+    
+    subgraph "CI/CD Pipeline"
+        CODECOMMIT("CodeCommit")
+        CODEBUILD("CodeBuild")
+        CODEPIPELINE("CodePipeline")
+    end
+    
+    subgraph "Alerts & Monitoring"
+        CLOUDWATCH --> SNS("SNS")
+        SNS --> EMAIL("Email Alerts")
+    end
+    
+    USER["User"] --> ROUTE53
+    ROUTE53 --> WAF
+    WAF --> ALB
+    ALB --> TASK1
+    ALB --> TASK2
+    TASK1 --> DB
+    TASK2 --> DB
+    
+    CODECOMMIT --> CODEBUILD
+    CODEBUILD --> ECR
+    CODEBUILD --> CODEPIPELINE
+    CODEPIPELINE --> ECS[("ECS Service\nUpdate")]
+    
+    TASK1 -.-> CLOUDWATCH
+    TASK2 -.-> CLOUDWATCH
+    DB -.-> CLOUDWATCH
+    
+    TASK1 --> SECRETS
+    TASK2 --> SECRETS

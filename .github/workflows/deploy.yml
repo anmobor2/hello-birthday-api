@@ -1,0 +1,397 @@
+name: Deploy Hello API
+
+on:
+  push:
+    branches:
+      - main        # For production
+      - develop     # For development
+      - staging     # For pre-production
+  pull_request:
+    branches:
+      - main
+      - develop
+      - staging
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  AWS_REGION: eu-west-1
+  ECR_REPOSITORY: hello-api
+  TF_VERSION: 1.5.7
+  SONAR_PROJECT_KEY: hello-api
+  SONAR_ORGANIZATION: your-organization
+
+jobs:
+  determine_environment:
+    name: Determine Environment
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+    steps:
+      - name: Set environment based on branch
+        id: set-env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=pro" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "environment=pre" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          fi
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better relevancy of SonarQube analysis
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install coverage pytest-cov
+
+      - name: Run tests with coverage
+        run: |
+          pytest --cov=app --cov-report=xml -v
+
+      - name: Cache SonarQube packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ env.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ env.SONAR_ORGANIZATION }}
+            -Dsonar.python.coverage.reportPaths=coverage.xml
+
+  security_scan:
+    name: Security Scans
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install bandit safety
+
+      - name: Run Bandit (Python Security Scanner)
+        run: |
+          bandit -r app/ -f json -o bandit-results.json
+        continue-on-error: true
+
+      - name: Run Safety (Check dependencies for vulnerabilities)
+        run: |
+          safety check --full-report -o json > safety-results.json
+        continue-on-error: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image for scanning
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: false
+          load: true
+          tags: hello-api:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: hello-api:scan
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy'
+
+      - name: Start container for OWASP ZAP scan
+        run: |
+          docker run -d --name hello-api-container -p 8000:8000 hello-api:scan
+          sleep 10  # Give container time to start
+
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.7.0
+        with:
+          target: 'http://localhost:8000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+        continue-on-error: true  # Allow the workflow to continue even if vulnerabilities are found
+
+      - name: Stop container
+        if: always()
+        run: docker stop hello-api-container
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: security-scan-results
+          path: |
+            bandit-results.json
+            safety-results.json
+            trivy-results.sarif
+            zap-baseline-report.html
+
+  build_and_push:
+    name: Build and Push Docker Image
+    needs: [test, security_scan, determine_environment]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.determine_environment.outputs.environment }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,format=short
+            ${{ needs.determine_environment.outputs.environment }}
+            latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Save image info for terraform
+        id: image-info
+        run: |
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.determine_environment.outputs.environment }}"
+          echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
+
+    outputs:
+      image_uri: ${{ steps.image-info.outputs.image_uri }}
+      environment: ${{ needs.determine_environment.outputs.environment }}
+
+  terraform_plan:
+    name: Terraform Plan
+    needs: [build_and_push, determine_environment]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.determine_environment.outputs.environment }}
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        id: init
+        run: |
+          terraform init \
+            -backend-config="bucket=hello-api-terraform-state" \
+            -backend-config="key=${{ needs.determine_environment.outputs.environment }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="dynamodb_table=hello-api-terraform-locks"
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          working_directory: terraform
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan \
+            -var="environment=${{ needs.determine_environment.outputs.environment }}" \
+            -var="ecr_repository_url=${{ needs.build_and_push.outputs.image_uri }}" \
+            -var-file="environments/${{ needs.determine_environment.outputs.environment }}/terraform.tfvars" \
+            -out=tfplan
+        continue-on-error: true
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-plan
+          path: terraform/tfplan
+
+      - name: Check Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  terraform_apply:
+    name: Terraform Apply
+    needs: [terraform_plan, build_and_push, determine_environment]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.determine_environment.outputs.environment }}
+    # Add approval for production deployments using environments
+    # Configure environment protection rules in GitHub repo settings
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v3
+        with:
+          name: terraform-plan
+          path: terraform/
+
+      - name: Terraform Init
+        id: init
+        run: |
+          terraform init \
+            -backend-config="bucket=hello-api-terraform-state" \
+            -backend-config="key=${{ needs.determine_environment.outputs.environment }}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="dynamodb_table=hello-api-terraform-locks"
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve tfplan
+
+  integration_tests:
+    name: Run Integration Tests
+    needs: [terraform_apply, determine_environment]
+    runs-on: ubuntu-latest
+    if: needs.determine_environment.outputs.environment != 'pro'  # Skip for production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install pytest-playwright
+          playwright install
+
+      - name: Run integration tests
+        run: |
+          pytest tests_integration/
+        env:
+          API_BASE_URL: ${{ needs.terraform_apply.outputs.api_url }}
+        continue-on-error: true  # Allow the workflow to continue even if some tests fail
+
+  notify:
+    name: Notify Deployment Result
+    needs: [terraform_apply, determine_environment]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify Success
+        if: ${{ needs.terraform_apply.result == 'success' }}
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "Successfully deployed Hello API to ${{ needs.determine_environment.outputs.environment }} environment"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Failure
+        if: ${{ needs.terraform_apply.result != 'success' }}
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "Failed to deploy Hello API to ${{ needs.determine_environment.outputs.environment }} environment"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

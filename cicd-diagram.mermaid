@@ -1,0 +1,54 @@
+flowchart TD
+    subgraph GitHub
+        GH[GitHub Repository] --> |Push to Branch| PR[Pull Request]
+        PR --> |Merge| BRANCH{Branch}
+        BRANCH --> |develop| DEV[Develop]
+        BRANCH --> |staging| PRE[Staging]
+        BRANCH --> |main| PROD[Main]
+    end
+
+    subgraph AWS["AWS CI/CD Pipeline"]
+        DEV --> |Trigger| DEV_PIPE[Development Pipeline]
+        PRE --> |Trigger| PRE_PIPE[Preproduction Pipeline]
+        PROD --> |Trigger| PROD_PIPE[Production Pipeline]
+        
+        subgraph Pipeline
+            STAGE1[Source\nGet code from GitHub]
+            STAGE2[Test\nRun unit tests]
+            STAGE3[Build\nBuild & push Docker image]
+            STAGE4[Approval\nManual approval]
+            STAGE5[Deploy\nDeploy to ECS]
+            
+            STAGE1 --> STAGE2
+            STAGE2 --> STAGE3
+            STAGE3 --> COND{Production?}
+            COND -->|Yes| STAGE4 --> STAGE5
+            COND -->|No| STAGE5
+        end
+        
+        DEV_PIPE --> Pipeline
+        PRE_PIPE --> Pipeline
+        PROD_PIPE --> Pipeline
+    end
+
+    subgraph AWS_Services["AWS Services"]
+        ECR[(Amazon ECR\nContainer Registry)]
+        ECS_DEV[ECS Cluster\nDevelopment]
+        ECS_PRE[ECS Cluster\nPreproduction]
+        ECS_PROD[ECS Cluster\nProduction]
+        
+        STAGE3 --> ECR
+        STAGE5 --> |Deploy to dev| ECS_DEV
+        STAGE5 --> |Deploy to pre| ECS_PRE
+        STAGE5 --> |Deploy to prod| ECS_PROD
+    end
+    
+    subgraph Notification
+        SNS[SNS Topic]
+        EMAIL[Email]
+        SLACK[Slack]
+        
+        Pipeline --> |Success/Failure| SNS
+        SNS --> EMAIL
+        SNS --> SLACK
+    end

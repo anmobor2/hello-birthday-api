@@ -1,0 +1,33 @@
+hello-api/
+├── app/
+│   ├── __init__.py
+│   ├── main.py                  # Punto de entrada de la aplicación
+│   ├── config.py                # Configuración de la aplicación
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── user.py              # Modelo de usuario para la base de datos
+│   ├── services/
+│   │   ├── __init__.py
+│   │   └── date_service.py      # Servicio para lógica de fechas
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── hello.py             # Rutas de la API
+│   └── database.py              # Configuración de la base de datos
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py              # Configuración de pruebas
+│   ├── test_api.py              # Pruebas de la API
+│   └── test_date_service.py     # Pruebas del servicio de fechas
+├── docker/
+│   ├── Dockerfile               # Configuración para construir la imagen
+│   └── docker-compose.yml       # Configuración para ejecutar el contenedor
+├── deploy/
+│   ├── terraform/               # Configuración de infraestructura como código
+│   ├── scripts/
+│   │   ├── build.sh             # Script para construir la aplicación
+│   │   └── deploy.sh            # Script para desplegar la aplicación
+│   └── aws/
+│       └── templates/           # Plantillas para AWS
+├── requirements.txt             # Dependencias de Python
+├── requirements-dev.txt         # Dependencias para desarrollo
+└── README.md                    # Documentación

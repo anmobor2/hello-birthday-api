@@ -1,0 +1,106 @@
+flowchart TB
+    subgraph terraform["Terraform Project Structure"]
+        subgraph modules["modules/"]
+            networking["networking/
+            - main.tf
+            - variables.tf
+            - outputs.tf"]
+            
+            ecs["ecs/
+            - main.tf
+            - variables.tf
+            - outputs.tf"]
+            
+            loadbalancer["loadbalancer/
+            - main.tf
+            - variables.tf
+            - outputs.tf"]
+            
+            monitoring["monitoring/
+            - main.tf
+            - variables.tf
+            - outputs.tf"]
+        end
+        
+        subgraph envs["environments/"]
+            subgraph dev["dev/"]
+                dev_main["main.tf"]
+                dev_vars["variables.tf"]
+                dev_tfvars["terraform.tfvars"]
+                dev_backend["backend.tf"]
+            end
+            
+            subgraph pre["pre/"]
+                pre_main["main.tf"]
+                pre_vars["variables.tf"]
+                pre_tfvars["terraform.tfvars"]
+                pre_backend["backend.tf"]
+            end
+            
+            subgraph pro["pro/"]
+                pro_main["main.tf"]
+                pro_vars["variables.tf"]
+                pro_tfvars["terraform.tfvars"]
+                pro_backend["backend.tf"]
+            end
+        end
+        
+        subgraph global["global/"]
+            global_main["main.tf"]
+            global_vars["variables.tf"]
+            global_outputs["outputs.tf"]
+        end
+    end
+    
+    subgraph s3["S3 State Backend"]
+        bucket["hello-api-terraform-state"]
+        subgraph keys["State Files"]
+            global_state["global/terraform.tfstate"]
+            dev_state["dev/terraform.tfstate"]
+            pre_state["pre/terraform.tfstate"]
+            pro_state["pro/terraform.tfstate"]
+        end
+    end
+    
+    subgraph aws["AWS Account"]
+        subgraph shared["Shared Resources"]
+            ecr["ECR Repository"]
+            kms["KMS Keys"]
+        end
+        
+        subgraph dev_infra["Dev Infrastructure"]
+            dev_vpc["VPC"]
+            dev_ecs["ECS Cluster"]
+            dev_alb["ALB"]
+        end
+        
+        subgraph pre_infra["Pre Infrastructure"]
+            pre_vpc["VPC"]
+            pre_ecs["ECS Cluster"]
+            pre_alb["ALB"]
+        end
+        
+        subgraph pro_infra["Pro Infrastructure"]
+            pro_vpc["VPC"]
+            pro_ecs["ECS Cluster"]
+            pro_alb["ALB"]
+        end
+    end
+    
+    global_main --> global_state
+    global_state --> shared
+    
+    dev_main --> networking & ecs & loadbalancer & monitoring
+    dev_tfvars --> dev_main
+    dev_main --> dev_state
+    dev_state --> dev_infra
+    
+    pre_main --> networking & ecs & loadbalancer & monitoring
+    pre_tfvars --> pre_main
+    pre_main --> pre_state
+    pre_state --> pre_infra
+    
+    pro_main --> networking & ecs & loadbalancer & monitoring
+    pro_tfvars --> pro_main
+    pro_main --> pro_state
+    pro_state --> pro_infra

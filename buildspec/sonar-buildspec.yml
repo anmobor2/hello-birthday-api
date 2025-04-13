@@ -1,0 +1,58 @@
+version: 0.2
+
+env:
+  variables:
+    SONAR_HOST_URL: "https://sonarcloud.io"  # or your SonarQube server URL
+    SONAR_SCANNER_VERSION: "4.7.0.2747"
+    SONAR_PROJECT_KEY: "hello-api"
+    SONAR_ORGANIZATION: "your-organization"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.10
+    commands:
+      # Install dependencies
+      - pip install -r requirements.txt
+      - pip install -r requirements-dev.txt
+      - pip install coverage pytest-cov
+
+      # Install SonarScanner
+      - wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux.zip
+      - unzip sonar-scanner-cli-$SONAR_SCANNER_VERSION-linux.zip
+      - export PATH=$PATH:$PWD/sonar-scanner-$SONAR_SCANNER_VERSION-linux/bin
+
+  pre_build:
+    commands:
+      # Run tests with coverage
+      - echo "Running tests with coverage"
+      - pytest --cov=app --cov-report=xml -v
+
+  build:
+    commands:
+      # Run SonarQube analysis
+      - echo "Running SonarQube analysis"
+      - >
+        sonar-scanner \
+          -Dsonar.projectKey=$SONAR_PROJECT_KEY \
+          -Dsonar.organization=$SONAR_ORGANIZATION \
+          -Dsonar.sources=app \
+          -Dsonar.tests=tests \
+          -Dsonar.host.url=$SONAR_HOST_URL \
+          -Dsonar.python.coverage.reportPaths=coverage.xml \
+          -Dsonar.login=$SONAR_TOKEN
+
+  post_build:
+    commands:
+      - echo "SonarQube analysis completed"
+
+reports:
+  sonarqube-report:
+    files:
+      - 'coverage.xml'
+    file-format: 'CLOVERXML'
+
+artifacts:
+  files:
+    - coverage.xml
+    - .scannerwork/report-task.txt
