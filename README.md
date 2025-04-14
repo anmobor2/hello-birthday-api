@@ -150,3 +150,4 @@ Design Decisions
    - AWS Fargate: Simplifies operations by eliminating server management.
 
    - Infrastructure as Code: All infrastructure defined with Terraform for easy replication and version control.
+## Pipeline Test
