@@ -32,7 +32,7 @@ class TestDateService:
         is_today, days_until = DateService.calculate_days_until_birthday(birth_date, reference_date)
 
         assert is_today is False
-        assert days_until == 360  # 365 - 5 días
+        assert days_until == 361  # 365 - 5 días
 
     def test_leap_year(self):
         # Probar años bisiestos

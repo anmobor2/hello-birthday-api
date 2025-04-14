@@ -1,9 +1,11 @@
 import os
 import pytest
+from datetime import date  # Añadir esta importación
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from datetime import date
 
 from app.main import app
 from app.database import Base, get_db
@@ -61,7 +63,7 @@ def client(db_session):
 @pytest.fixture
 def sample_user(db_session):
     # Crear un usuario de ejemplo
-    user = User(username="testuser", date_of_birth="1990-01-15")
+    user = User(username="testuser", date_of_birth=date(1990, 1, 15))  # Usar objeto date
     db_session.add(user)
     db_session.commit()
     return user

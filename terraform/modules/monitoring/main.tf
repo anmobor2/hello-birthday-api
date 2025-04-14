@@ -119,7 +119,6 @@ resource "aws_cloudwatch_metric_alarm" "memory_high" {
 
 # HTTP 5XX errors alarm
 resource "aws_cloudwatch_metric_alarm" "http_5xx" {
-  count = var.alb_arn_suffix != "" && var.target_group_arn_suffix != "" ? 1 : 0
 
   alarm_name          = "${local.name_prefix}-5xx-errors"
   comparison_operator = "GreaterThanThreshold"
@@ -130,13 +129,19 @@ resource "aws_cloudwatch_metric_alarm" "http_5xx" {
   statistic           = "Sum"
   threshold           = var.error_threshold
   alarm_description   = "This alarm monitors HTTP 5XX errors"
-  alarm_actions       = var.create_sns_topic ? [aws_sns_topic.alerts[0].arn] : []
-  ok_actions          = var.create_sns_topic ? [aws_sns_topic.alerts[0].arn] : []
 
-  dimensions = {
+  # Use the conditional for alarm_actions instead of count
+  alarm_actions       = var.create_sns_topic && var.alb_arn_suffix != "" ? [aws_sns_topic.alerts[0].arn] : []
+  ok_actions          = var.create_sns_topic && var.alb_arn_suffix != "" ? [aws_sns_topic.alerts[0].arn] : []
+
+  # Only create dimensions if the ARNs are provided
+  dimensions = var.alb_arn_suffix != "" && var.target_group_arn_suffix != "" ? {
     LoadBalancer = var.alb_arn_suffix
     TargetGroup  = var.target_group_arn_suffix
-  }
+  } : {}
+
+  # Add this to prevent errors when dimensions are empty
+  count = var.enable_alb_alarm ? 1 : 0
 
   tags = merge(
     var.common_tags,

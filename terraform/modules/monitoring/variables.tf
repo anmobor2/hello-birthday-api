@@ -76,3 +76,9 @@ variable "common_tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_alb_alarm" {
+  description = "Whether to enable ALB-related alarms"
+  type        = bool
+  default     = false
+}

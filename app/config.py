@@ -8,7 +8,6 @@ class EnvironmentType(str, Enum):
     TEST = "test"
     PROD = "production"
 
-
 class Settings(BaseSettings):
     APP_NAME: str = "hello-api"
     ENVIRONMENT: EnvironmentType = EnvironmentType.DEV
