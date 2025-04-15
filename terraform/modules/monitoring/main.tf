@@ -283,14 +283,10 @@ resource "aws_iam_role_policy_attachment" "grafana_cloudwatch" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonCloudWatchReadOnlyAccess"
 }
 
-resource "aws_grafana_dashboard" "hello_api" {
+resource "grafana_dashboard" "hello_api" {
   count = var.enable_grafana ? 1 : 0
 
-  workspace_id = aws_grafana_workspace.this[0].id
-  name         = "hello-api-dashboard"
-  folder_id    = "General"
-
-  dashboard_body = jsonencode({
+  config_json = jsonencode({
     "annotations": {
       "list": []
     },
@@ -710,6 +706,8 @@ resource "aws_grafana_dashboard" "hello_api" {
     "uid": "hello-api-${var.environment}",
     "version": 1
   })
+
+  overwrite = true
 }
 
 # Data source for getting the current account ID

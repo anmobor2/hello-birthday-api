@@ -4,26 +4,21 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 4.0"
     }
+    grafana = {
+      source  = "grafana/grafana"
+      version = "~> 1.36.0"
+    }
   }
-
-  # Note: The actual backend configuration is in each environment's backend.tf file
-  # environments/dev/backend.tf, environments/pre/backend.tf, etc.
 }
 
-# Original AWS provider configuration (commented for LocalStack testing)
-# provider "aws" {
-#   region = var.aws_region
-#
-#   default_tags {
-#     tags = {
-#       Environment = var.environment
-#       Project     = var.project_name
-#       ManagedBy   = "terraform"
-#     }
-#   }
-# }
+# Mantén tu configuración existente para el proveedor AWS
 
-# LocalStack provider configuration for local testing
+# Añade el proveedor de Grafana
+provider "grafana" {
+  url  = "http://localhost:3000"  # Ajusta según tu configuración
+  auth = "admin:admin"           # Ajusta según tus credenciales
+}
+# LocalStack provider configuration for testing
 provider "aws" {
   region                      = var.aws_region
   access_key                  = "test"
@@ -33,7 +28,6 @@ provider "aws" {
   skip_metadata_api_check     = true
   s3_use_path_style           = true
 
-  # Keep the original default tags
   default_tags {
     tags = {
       Environment = var.environment
@@ -42,7 +36,6 @@ provider "aws" {
     }
   }
 
-  # LocalStack endpoints
   endpoints {
     acm                  = "http://localhost:4566"
     apigateway           = "http://localhost:4566"
