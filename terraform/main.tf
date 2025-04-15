@@ -120,11 +120,11 @@ module "monitoring" {
   alarm_email         = var.alarm_email
   enable_enhanced_monitoring = var.enable_enhanced_monitoring
 
-  # Grafana (nueva adición)
+  # Grafana
   enable_grafana      = true
   grafana_admin_user_arns = var.grafana_admin_user_arns
 
-  enable_alb_alarm    = true  # Asegurarte de activar las alarmas ALB
+  enable_alb_alarm    = true
 
   common_tags         = var.common_tags
 

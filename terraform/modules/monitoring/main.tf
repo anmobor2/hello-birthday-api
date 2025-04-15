@@ -232,7 +232,6 @@ resource "aws_cloudwatch_dashboard" "main" {
 }
 
 # Grafana workspace
-# Grafana workspace
 resource "aws_grafana_workspace" "this" {
   count = var.enable_grafana ? 1 : 0
 
@@ -277,7 +276,6 @@ resource "aws_iam_role" "grafana" {
   )
 }
 
-# Políticas necesarias para Grafana
 resource "aws_iam_role_policy_attachment" "grafana_cloudwatch" {
   count = var.enable_grafana ? 1 : 0
 
