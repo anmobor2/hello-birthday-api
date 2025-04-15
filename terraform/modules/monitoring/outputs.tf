@@ -22,3 +22,13 @@ output "dashboard_name" {
   description = "The name of the CloudWatch dashboard"
   value       = aws_cloudwatch_dashboard.main.dashboard_name
 }
+
+output "grafana_workspace_id" {
+  description = "The ID of the Grafana workspace"
+  value       = var.enable_grafana ? aws_grafana_workspace.this[0].id : null
+}
+
+output "grafana_endpoint" {
+  description = "The endpoint URL of the Grafana workspace"
+  value       = var.enable_grafana ? aws_grafana_workspace.this[0].endpoint : null
+}

@@ -82,3 +82,15 @@ variable "enable_alb_alarm" {
   type        = bool
   default     = false
 }
+
+variable "enable_grafana" {
+  description = "Whether to enable Amazon Managed Grafana"
+  type        = bool
+  default     = false
+}
+
+variable "grafana_admin_user_arns" {
+  description = "List of ARNs of users/roles that should have Grafana admin permissions"
+  type        = list(string)
+  default     = []
+}

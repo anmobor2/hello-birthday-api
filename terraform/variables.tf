@@ -226,3 +226,9 @@ variable "common_tags" {
     ManagedBy   = "terraform"
   }
 }
+
+variable "grafana_admin_user_arns" {
+  description = "List of ARNs of users/roles that should have Grafana admin permissions"
+  type        = list(string)
+  default     = []
+}

@@ -231,5 +231,488 @@ resource "aws_cloudwatch_dashboard" "main" {
   })
 }
 
+# Grafana workspace
+# Grafana workspace
+resource "aws_grafana_workspace" "this" {
+  count = var.enable_grafana ? 1 : 0
+
+  name                     = "${local.name_prefix}-grafana"
+  account_access_type      = "CURRENT_ACCOUNT"
+  authentication_providers = ["AWS_SSO"]
+  permission_type          = "SERVICE_MANAGED"
+  data_sources             = ["CLOUDWATCH"]
+
+  role_arn = aws_iam_role.grafana[0].arn
+
+  tags = merge(
+    var.common_tags,
+    {
+      Environment = var.environment
+    }
+  )
+}
+
+# IAM role para Grafana
+resource "aws_iam_role" "grafana" {
+  count = var.enable_grafana ? 1 : 0
+
+  name = "${local.name_prefix}-grafana-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "grafana.amazonaws.com"
+      }
+    }]
+  })
+
+  tags = merge(
+    var.common_tags,
+    {
+      Environment = var.environment
+    }
+  )
+}
+
+# Políticas necesarias para Grafana
+resource "aws_iam_role_policy_attachment" "grafana_cloudwatch" {
+  count = var.enable_grafana ? 1 : 0
+
+  role       = aws_iam_role.grafana[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonCloudWatchReadOnlyAccess"
+}
+
+resource "aws_grafana_dashboard" "hello_api" {
+  count = var.enable_grafana ? 1 : 0
+
+  workspace_id = aws_grafana_workspace.this[0].id
+  name         = "hello-api-dashboard"
+  folder_id    = "General"
+
+  dashboard_body = jsonencode({
+    "annotations": {
+      "list": []
+    },
+    "editable": true,
+    "graphTooltip": 0,
+    "links": [],
+    "panels": [
+      {
+        "datasource": "CloudWatch",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 30,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": true
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "percent"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "options": {
+          "legend": {
+            "calcs": ["mean", "max"],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": "CloudWatch",
+            "dimensions": {
+              "ClusterName": "${var.ecs_cluster_name}",
+              "ServiceName": "${var.ecs_service_name}"
+            },
+            "metricName": "CPUUtilization",
+            "namespace": "AWS/ECS",
+            "period": "",
+            "refId": "A",
+            "statistic": "Average"
+          }
+        ],
+        "title": "ECS CPU Utilization",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "CloudWatch",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 30,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "smooth",
+              "lineWidth": 2,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": true
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "percent"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "options": {
+          "legend": {
+            "calcs": ["mean", "max"],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": "CloudWatch",
+            "dimensions": {
+              "ClusterName": "${var.ecs_cluster_name}",
+              "ServiceName": "${var.ecs_service_name}"
+            },
+            "metricName": "MemoryUtilization",
+            "namespace": "AWS/ECS",
+            "period": "",
+            "refId": "A",
+            "statistic": "Average"
+          }
+        ],
+        "title": "ECS Memory Utilization",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "CloudWatch",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "bars",
+              "fillOpacity": 30,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": true
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "reqps"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "options": {
+          "legend": {
+            "calcs": ["sum", "max"],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": "CloudWatch",
+            "dimensions": {
+              "LoadBalancer": "${var.alb_arn_suffix}"
+            },
+            "metricName": "RequestCount",
+            "namespace": "AWS/ApplicationELB",
+            "period": "",
+            "refId": "A",
+            "statistic": "Sum"
+          }
+        ],
+        "title": "Request Count",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "CloudWatch",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "bars",
+              "fillOpacity": 30,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": true
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "none"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "HTTPCode_Target_2XX_Count"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "green",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "HTTPCode_Target_4XX_Count"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "orange",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "HTTPCode_Target_5XX_Count"
+              },
+              "properties": [
+                {
+                  "id": "color",
+                  "value": {
+                    "fixedColor": "red",
+                    "mode": "fixed"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "options": {
+          "legend": {
+            "calcs": ["sum"],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": "CloudWatch",
+            "dimensions": {
+              "LoadBalancer": "${var.alb_arn_suffix}"
+            },
+            "metricName": "HTTPCode_Target_2XX_Count",
+            "namespace": "AWS/ApplicationELB",
+            "period": "",
+            "refId": "A",
+            "statistic": "Sum"
+          },
+          {
+            "datasource": "CloudWatch",
+            "dimensions": {
+              "LoadBalancer": "${var.alb_arn_suffix}"
+            },
+            "metricName": "HTTPCode_Target_4XX_Count",
+            "namespace": "AWS/ApplicationELB",
+            "period": "",
+            "refId": "B",
+            "statistic": "Sum"
+          },
+          {
+            "datasource": "CloudWatch",
+            "dimensions": {
+              "LoadBalancer": "${var.alb_arn_suffix}"
+            },
+            "metricName": "HTTPCode_Target_5XX_Count",
+            "namespace": "AWS/ApplicationELB",
+            "period": "",
+            "refId": "C",
+            "statistic": "Sum"
+          }
+        ],
+        "title": "HTTP Response Codes",
+        "type": "timeseries"
+      }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 36,
+    "style": "dark",
+    "tags": [
+      "hello-api",
+      "ecs",
+      "${var.environment}"
+    ],
+    "templating": {
+      "list": []
+    },
+    "time": {
+      "from": "now-3h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Hello API Dashboard",
+    "uid": "hello-api-${var.environment}",
+    "version": 1
+  })
+}
+
 # Data source for getting the current account ID
 data "aws_caller_identity" "current" {}

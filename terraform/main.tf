@@ -115,9 +115,16 @@ module "monitoring" {
   memory_threshold    = var.memory_alarm_threshold
   error_threshold     = var.error_alarm_threshold
 
+  # Alerting
   create_sns_topic    = var.create_alarm_topic
   alarm_email         = var.alarm_email
   enable_enhanced_monitoring = var.enable_enhanced_monitoring
+
+  # Grafana (nueva adición)
+  enable_grafana      = true
+  grafana_admin_user_arns = var.grafana_admin_user_arns
+
+  enable_alb_alarm    = true  # Asegurarte de activar las alarmas ALB
 
   common_tags         = var.common_tags
 
