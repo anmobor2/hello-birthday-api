@@ -25,9 +25,9 @@ hello-api/
 │   ├── terraform/               # Configuración de infraestructura como código
 │   ├── scripts/
 │   │   ├── build.sh             # Script para construir la aplicación
-│   │   └── deploy.sh            # Script para desplegar la aplicación
-│   └── aws/
-│       └── templates/           # Plantillas para AWS
+│       └── deploy.sh            # Script para desplegar la aplicación
+│
+│
 ├── requirements.txt             # Dependencias de Python
 ├── requirements-dev.txt         # Dependencias para desarrollo
 └── README.md                    # Documentación

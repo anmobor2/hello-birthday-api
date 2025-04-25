@@ -45,7 +45,7 @@ Shared resources like ECR repositories are defined once in the global directory 
 
 1. First, deploy the global resources:
    ```bash
-   cd terraform/global
+   cd deploy/terraform/global
    terraform init
    terraform apply
    ```
@@ -62,7 +62,7 @@ To set up a specific environment (e.g., dev):
 
 1. Navigate to the environment directory:
    ```bash
-   cd terraform/environments/dev
+   cd deploy/terraform/environments/dev
    ```
 
 2. Initialize Terraform with the proper backend:
@@ -88,7 +88,7 @@ When making changes:
 2. For changes that affect all environments, modify the modules
 3. To update a single environment after module changes:
    ```bash
-   cd terraform/environments/dev
+   cd deploy/terraform/environments/dev
    terraform plan
    terraform apply
    ```
