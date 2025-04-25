@@ -184,6 +184,17 @@ cython_debug/
 *.tfstate.backup
 .terraform.lock.hcl
 
+# Ignore SonarQube scanner work directory if accidentally copied
+.scannerwork/
+
+# Ignore temporary and generated files
+*.tmp
+*.zip
+*.tar.gz
+
+# Ignore AWS CodeBuild artifacts (if stored locally)
+taskdef.json
+imageDefinition.json
 
 .idea/terraform.xml
 .idea/

@@ -150,4 +150,10 @@ Design Decisions
    - AWS Fargate: Simplifies operations by eliminating server management.
 
    - Infrastructure as Code: All infrastructure defined with Terraform for easy replication and version control.
-## Pipeline Test
+
+
+## AWS Buildspec Templates
+
+Note: The `buildspec/` folder contains AWS CodeBuild buildspec templates.  
+These are not currently active but can be used to configure AWS-native CI/CD pipelines if needed.
+
