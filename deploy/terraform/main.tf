@@ -130,3 +130,27 @@ module "monitoring" {
 
   depends_on = [module.ecs, module.loadbalancer]
 }
+
+resource "aws_wafv2_web_acl_association" "alb" {
+  count        = var.waf_web_acl_arn != "" ? 1 : 0
+  resource_arn = module.loadbalancer.alb_arn
+  web_acl_arn  = var.waf_web_acl_arn
+}
+
+module "cicd" {
+  source = "./modules/cicd"
+  count  = var.enable_cicd ? 1 : 0
+
+  project_name              = var.project_name
+  environment               = var.environment
+  aws_region                = var.aws_region
+  github_repository         = var.github_repository
+  github_branch             = "main"
+  ecr_repository_uri        = var.ecr_repository_url
+  ecs_cluster_name          = module.ecs.ecs_cluster_name
+  ecs_service_name          = module.ecs.ecs_service_name
+  task_execution_role_arn   = module.iam.task_execution_role_arn
+  task_role_arn             = module.iam.task_role_arn
+
+  common_tags = var.common_tags
+}

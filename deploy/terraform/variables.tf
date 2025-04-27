@@ -232,3 +232,22 @@ variable "grafana_admin_user_arns" {
   type        = list(string)
   default     = []
 }
+
+variable "enable_cicd" {
+  description = "Whether to enable CI/CD pipeline for this environment"
+  type        = bool
+  default     = false
+}
+
+variable "github_repository" {
+  description = "GitHub repository name (e.g. 'usuario/repo')"
+  type        = string
+  default     = ""
+}
+
+variable "waf_web_acl_arn" {
+  description = "ARN of the WAF Web ACL to associate with the ALB"
+  type        = string
+  default     = ""
+}
+

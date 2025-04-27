@@ -11,14 +11,7 @@ terraform {
   }
 }
 
-# Mantén tu configuración existente para el proveedor AWS
-
-# Añade el proveedor de Grafana
-provider "grafana" {
-  url  = "http://localhost:3000"  # Ajusta según tu configuración
-  auth = "admin:admin"           # Ajusta según tus credenciales
-}
-# LocalStack provider configuration for testing
+# Configuración del proveedor AWS para LocalStack
 provider "aws" {
   region                      = var.aws_region
   access_key                  = "test"
@@ -54,4 +47,10 @@ provider "aws" {
     sqs                  = "http://localhost:4566"
     sts                  = "http://localhost:4566"
   }
+}
+
+# Configuración del proveedor de Grafana
+provider "grafana" {
+  url  = "http://localhost:3000"
+  auth = "admin:admin"
 }

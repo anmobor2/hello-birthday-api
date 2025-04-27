@@ -84,28 +84,72 @@ docker-compose up --build
    - AWS account with configured AWS CLI
    - Terraform installed
 
-#### Deployment Steps
+#### Terraform Infrastructure Deployment
 
-1. Configure Terraform variables:
+1. Move to the Terraform directory:
 ```
 cd deploy/terraform
-cp terraform.tfvars.example terraform.tfvars
 ```
 
 2. Initialize Terraform:
 ```
 terraform init
 ```
-3. Apply the configuration:
+3. Choose the environment (dev, pre, or pro) and apply the configuration using the corresponding variables file.
+
+For example, for development:
 ```
-terraform apply
+cd deploy/terraform/environments/dev
+terraform init
+terraform plan -var-file="terraform.tfvars"
+terraform apply -var-file="terraform.tfvars"
 ```
-4. Build and deploy the application:
+O
+```
+terraform -chdir=deploy/terraform/environments/dev init
+terraform -chdir=deploy/terraform/environments/dev plan -var-file=terraform.tfvars
+terraform -chdir=deploy/terraform/environments/dev apply -var-file=terraform.tfvars
+```
+
+For production:
+```
+cd deploy/terraform/environments/pro
+terraform init
+terraform plan -var-file="terraform.tfvars"
+terraform apply -var-file="terraform.tfvars"
+```
+O
+```
+terraform -chdir=deploy/terraform/environments/pro init
+terraform -chdir=deploy/terraform/environments/pro plan -var-file=terraform.tfvars
+terraform -chdir=deploy/terraform/environments/pro apply -var-file=terraform.tfvars
+```
+
+4. Build and deploy the application Docker images:
+
 ```
 cd ../../
 deploy/scripts/build.sh
 deploy/scripts/deploy.sh
 ```
+
+#### Terraform Structure and Behavior
+
+  - Modular Architecture:
+  Infrastructure is composed of reusable modules (networking, ecs, loadbalancer, iam, monitoring, etc.).
+
+  - Environment-specific Configuration:
+  Each environment (dev, pre, pro) has its own variables file under deploy/terraform/environments/.
+
+  - Dynamic Features:
+
+      WAF (Web Application Firewall) is optionally attached to the Load Balancer if a waf_web_acl_arn is provided.
+
+      CI/CD pipelines are optionally created via AWS CodePipeline and CodeBuild if enable_cicd is set to true.
+
+  - State Management:
+  Remote state is stored securely in an S3 bucket with locking via DynamoDB.
+
 
 ### AWS Architecture
 
@@ -119,7 +163,9 @@ The system is deployed on AWS using the following services:
 
    - Amazon ECR: For Docker image storage
 
-   - CloudWatch: For monitoring and logging
+   - AWS WAF (optional): To protect against common web attacks
+
+   - CloudWatch: For monitoring, alarms and logging
 
    - Route 53: For DNS management
 
@@ -131,11 +177,13 @@ For complete details, see the architecture diagram in the documentation.
 
    - Availability: Runs in multiple availability zones with a load balancer.
 
-   - Monitoring: CloudWatch metrics and alarms for CPU and memory.
+   - Monitoring and Alerting: CPU, memory, and application-level metrics with alarms.
 
    - Zero-downtime deployment: Uses blue/green deployment strategy in ECS.
 
-   - Security: Implemented in a VPC with public/private subnets and proper security groups.
+   - Security: VPC isolation, security groups, HTTPS endpoints, optional WAF protection.
+
+   - Resilient Deployments: Terraform enables full reproducibility of infrastructure.
 
 Design Decisions
 
